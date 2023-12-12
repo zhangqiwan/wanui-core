@@ -1243,7 +1243,8 @@ function baseCreateRenderer(
         processCommentNode(null, placeholder, container!, anchor)
         // This noramlly gets setup by the following `setupRenderEffect`.
         // But the call is skipped in initial mounting of async element.
-        // Thus, manually patching is required here or it will result in a crash during parent component update.
+        // Thus, manually patching is required here or it will result in a crash
+        // during parent component update.
         initialVNode.el = placeholder.el
       }
       return
@@ -2521,7 +2522,12 @@ function locateNonHydratedAsyncRoot(
 ): ComponentInternalInstance | undefined {
   const subComponent = instance.subTree.component
   if (subComponent) {
-    if (subComponent.asyncDep && !subComponent.asyncResolved) {
+    if (
+      // this happens only during hydration
+      !subComponent.subTree &&
+      subComponent.asyncDep &&
+      !subComponent.asyncResolved
+    ) {
       return subComponent
     } else {
       return locateNonHydratedAsyncRoot(subComponent)
