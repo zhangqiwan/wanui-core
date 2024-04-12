@@ -20,7 +20,7 @@ import { inlineEnums } from './scripts/inline-enums.js'
  * @template {keyof T} K
  * @typedef { Omit<T, K> & Required<Pick<T, K>> } MarkRequired
  */
-/** @typedef {'cjs' | 'esm-bundler' | 'global' | 'global-runtime' | 'esm-browser' | 'esm-bundler-runtime' | 'esm-browser-runtime'} PackageFormat */
+/** @typedef {'cjs' | 'esm-bundler' | 'global' | 'global-runtime' | 'esm-browser' | 'esm-node' | 'esm-bundler-runtime' | 'esm-browser-runtime'} PackageFormat */
 /** @typedef {MarkRequired<import('rollup').OutputOptions, 'file' | 'format'>} OutputOptions */
 
 if (!process.env.TARGET) {
@@ -57,6 +57,10 @@ const outputConfigs = {
     file: resolve(`dist/${name}.cjs.js`),
     format: 'cjs',
   },
+  'esm-node': {
+    file: resolve(`dist/${name}.esm-node.mjs`),
+    format: 'es',
+  },
   global: {
     file: resolve(`dist/${name}.global.js`),
     format: 'iife',
@@ -84,6 +88,12 @@ const inlineFormats = /** @type {any} */ (
 )
 /** @type {ReadonlyArray<PackageFormat>} */
 const packageFormats = inlineFormats || packageOptions.formats || defaultFormats
+
+if (packageFormats.includes('cjs')) {
+  // @ts-expect-error
+  packageFormats.push('esm-node')
+}
+
 const packageConfigs = process.env.PROD_ONLY
   ? []
   : packageFormats.map(format => createConfig(format, outputConfigs[format]))
@@ -93,7 +103,7 @@ if (process.env.NODE_ENV === 'production') {
     if (packageOptions.prod === false) {
       return
     }
-    if (format === 'cjs') {
+    if (format === 'cjs' || format === 'esm-node') {
       packageConfigs.push(createProductionConfig(format))
     }
     if (/^(global|esm-browser)(-runtime)?/.test(format)) {
@@ -118,11 +128,12 @@ function createConfig(format, output, plugins = []) {
   }
 
   const isProductionBuild =
-    process.env.__DEV__ === 'false' || /\.prod\.js$/.test(output.file)
+    process.env.__DEV__ === 'false' || /\.prod\.m?js$/.test(output.file)
   const isBundlerESMBuild = /esm-bundler/.test(format)
   const isBrowserESMBuild = /esm-browser/.test(format)
   const isServerRenderer = name === 'server-renderer'
   const isCJSBuild = format === 'cjs'
+  const isNodeBuild = isCJSBuild || format === 'esm-node'
   const isGlobalBuild = /global/.test(format)
   const isCompatPackage =
     pkg.name === '@vue/compat' || pkg.name === '@vue/compat-canary'
@@ -131,24 +142,22 @@ function createConfig(format, output, plugins = []) {
     (isGlobalBuild || isBrowserESMBuild || isBundlerESMBuild) &&
     !packageOptions.enableNonBrowserBranches
 
-  output.banner = `/**
+  const banner = `/**
 * ${pkg.name} v${masterVersion}
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
 * @license MIT
 **/`
 
-  output.exports = isCompatPackage ? 'auto' : 'named'
-  if (isCJSBuild) {
-    output.esModule = true
-  }
-  output.sourcemap = !!process.env.SOURCE_MAP
-  output.externalLiveBindings = false
-  // https://github.com/rollup/rollup/pull/5380
-  output.reexportProtoFromExternal = false
-
-  if (isGlobalBuild) {
-    output.name = packageOptions.name
-  }
+  Object.assign(output, {
+    banner,
+    name: packageOptions.name,
+    exports: isCompatPackage ? 'auto' : 'named',
+    esModule: isCJSBuild,
+    sourcemap: !!process.env.SOURCE_MAP,
+    externalLiveBindings: false,
+    // https://github.com/rollup/rollup/pull/5380
+    reexportProtoFromExternal: false,
+  })
 
   let entryFile = /runtime$/.test(format) ? `src/runtime.ts` : `src/index.ts`
 
@@ -174,9 +183,9 @@ function createConfig(format, output, plugins = []) {
       __ESM_BUNDLER__: String(isBundlerESMBuild),
       __ESM_BROWSER__: String(isBrowserESMBuild),
       // is targeting Node (SSR)?
-      __CJS__: String(isCJSBuild),
+      __CJS__: String(isNodeBuild),
       // need SSR-specific branches?
-      __SSR__: String(isCJSBuild || isBundlerESMBuild || isServerRenderer),
+      __SSR__: String(isNodeBuild || isBundlerESMBuild || isServerRenderer),
 
       // 2.x compat build
       __COMPAT__: String(isCompatBuild),
@@ -329,9 +338,10 @@ function createConfig(format, output, plugins = []) {
       ...resolveReplace(),
       esbuild({
         tsconfig: path.resolve(__dirname, 'tsconfig.json'),
+        // @ts-expect-error only booleans here
         sourceMap: output.sourcemap,
         minify: false,
-        target: isServerRenderer || isCJSBuild ? 'es2019' : 'es2015',
+        target: isServerRenderer || isNodeBuild ? 'es2019' : 'es2015',
         define: resolveDefine(),
       }),
       ...resolveNodePlugins(),
@@ -351,7 +361,9 @@ function createConfig(format, output, plugins = []) {
 
 function createProductionConfig(/** @type {PackageFormat} */ format) {
   return createConfig(format, {
-    file: resolve(`dist/${name}.${format}.prod.js`),
+    file: resolve(
+      `dist/${name}.${format}.prod.${format === 'esm-node' ? 'mjs' : 'js'}`,
+    ),
     format: outputConfigs[format].format,
   })
 }
@@ -360,7 +372,7 @@ function createMinifiedConfig(/** @type {PackageFormat} */ format) {
   return createConfig(
     format,
     {
-      file: outputConfigs[format].file.replace(/\.js$/, '.prod.js'),
+      file: outputConfigs[format].file.replace(/\.(m?js)$/, '.prod.$1'),
       format: outputConfigs[format].format,
     },
     [

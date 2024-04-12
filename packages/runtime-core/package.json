@@ -13,6 +13,7 @@
     ".": {
       "types": "./dist/runtime-core.d.ts",
       "node": {
+        "import": "./dist/runtime-core.esm-node.prod.mjs",
         "production": "./dist/runtime-core.cjs.prod.js",
         "development": "./dist/runtime-core.cjs.js",
         "default": "./index.js"

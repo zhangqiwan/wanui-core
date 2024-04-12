@@ -368,6 +368,12 @@ importers:
 
   packages/shared: {}
 
+  packages/ssr-perf:
+    dependencies:
+      vue:
+        specifier: workspace:*
+        version: link:../vue
+
   packages/template-explorer:
     dependencies:
       monaco-editor:

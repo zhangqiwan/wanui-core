@@ -14,6 +14,7 @@
     ".": {
       "types": "./dist/runtime-dom.d.ts",
       "node": {
+        "import": "./dist/runtime-dom.esm-node.prod.mjs",
         "production": "./dist/runtime-dom.cjs.prod.js",
         "development": "./dist/runtime-dom.cjs.js",
         "default": "./index.js"

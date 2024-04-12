@@ -15,6 +15,7 @@
     ".": {
       "types": "./dist/reactivity.d.ts",
       "node": {
+        "import": "./dist/reactivity.esm-node.prod.mjs",
         "production": "./dist/reactivity.cjs.prod.js",
         "development": "./dist/reactivity.cjs.js",
         "default": "./index.js"

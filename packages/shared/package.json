@@ -13,6 +13,7 @@
     ".": {
       "types": "./dist/shared.d.ts",
       "node": {
+        "import": "./dist/shared.esm-node.prod.mjs",
         "production": "./dist/shared.cjs.prod.js",
         "development": "./dist/shared.cjs.js",
         "default": "./index.js"
